@@ -1,67 +1,66 @@
-const fs = require('fs')
 
-const data = fs.readFileSync('data/20160705.txt').toString().split(/\r?\n/)
-const location = fs.readFileSync('data/location').toString().split(/\r?\n/)
-const unitSet = new Set()
+const db = require('./model/db');
+const prepareAgent = require('./data_prepare');
+(async () => {
+    const data = prepareAgent.prepareData()
+    const dbInstanse = await db()
 
-Array('台', "感", "審", "侵", "勞", "少", "仲", "原", "家", "軍", "毒", "緝", '臺', '更', '抗', "覆", "職", "非", "附", "基").forEach(element => {
-    unitSet.add(element)
-})
-Array("撤緩", "保險", "交易", "附民", "再審", "裁正", "海商", "財專", "國貿", "感抗", "勞安", "訴願", "移調").forEach(ele => {
-    unitSet.add(ele)
-})
 
-location.forEach(ele => {
-    unitSet.add(ele)
-})
-const arr = []
+    const relationSet = new Set()
+    try {
+        for (let i = 0; i < data.length; i++) {
 
-for (let i = 0; i < data.length; i++) {
-    if (data[i].length == 1) {
-        arr.push(data[i])
-        unitSet.add(data[i])
-        continue
-    }
-}
+            const s = data[i]
+            relationSet.clear()
+            for (let j = 0; j < s.length;) {
+                let insertValue = ""
+                const unit = s.charAt(j)
+                const unit2 = s.slice(j, j + 2)
 
-const numberFilter = new Set()
-Array("一", "二", "三", "四", "五", "六", "七").forEach(ele => numberFilter.add(ele))
-for (let i = 0; i < data.length; i++) {
-    const len = data[i].length
-    curr_arr_dp = new Array(len).fill(false)
-    curr_arr_dp[0] = true
-    for (let a = 1; a <= len; a++) {
-
-        for (let b = a - 1; b >= 0; b--) {
-            if (curr_arr_dp[b]) {
-                const splitWord = data[i].substring(b, a)
-
-                if (unitSet.has(splitWord)) {
-                    curr_arr_dp[a] = true
-                    break
+                // 先找兩字再找一字, 避免兩字由一字的單位元組成
+                if (prepareAgent.unitSet2.has(unit2)) {
+                    insertValue = unit2
+                    j += 2
+                } else {
+                    insertValue = unit
+                    j++
                 }
+                const endCheck = (j === s.length)
+                relationSet.add(insertValue)
+                await dbInstanse.executeQuery('MERGE (:word {value: $value ,end: $end})',
+                    {
+                        value: insertValue,
+                        end: endCheck
+                    },
+                    { database: 'neo4j' }
+                )
+
             }
+
+            const arrayLikeSet = Array.from(relationSet)
+            for (let i = 0; i < arrayLikeSet.length - 1; i++) {
+                await dbInstanse.executeQuery(`MATCH (a:word), (b:word)
+                    WHERE a.value = $value1 AND a.end = false AND b.value = $value2
+                    CREATE (b)-[: Concat]->(a)
+                    `,
+                    {
+                        value1: arrayLikeSet[i],
+                        value2: arrayLikeSet[i + 1]
+                    },
+                    { database: 'neo4j' }
+                )
+            }
+
         }
+        // delete duplicate relation
+        await dbInstanse.executeQuery(`match ()-[r]->() 
+            match (s)-[r]->(e) 
+            with s,e,type(r) as typ, tail(collect(r)) as coll 
+            foreach(x in coll | delete x)`
+        )
+    } catch (e) {
+        dbInstanse.close()
+        throw e
     }
-    // prepare to insert
-    if (curr_arr_dp[len]) {
-        // console.log("OK")
-        // console.log(data[i])
-
-    } else {
-        // TODO: 剩餘250左右的不確定如何收束的貫字
-        if (data[i].indexOf("(") < 0 && !numberFilter.has(data[i][data[i].length - 1])) {
-            // console.log("N")
-            // console.log(data[i])
-        }
-
-    }
-
-
-}
-
-// console.dir(needAdd, { maxArrayLength: null })
-// console.dir(needAdd.size)
-
-console.dir(arr, { maxArrayLength: null })
-// console.dir(arr[1], { maxArrayLength: null })
+    dbInstanse.close()
+})()
