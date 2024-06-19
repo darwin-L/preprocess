@@ -1,5 +1,4 @@
 const fs = require('fs')
-const { exit } = require('process')
 
 const data = fs.readFileSync('data/20160705.txt').toString().split(/\r?\n/)
 const location = fs.readFileSync('data/location').toString().split(/\r?\n/)
@@ -18,6 +17,7 @@ function prepareData() {
         unitSet2.add(ele)
     })
     
+    // 目前地名set與unitSet沒有完全能重組的字元
     location.forEach(ele => {
         unitSet.add(ele)
         locationSet.add(ele)
@@ -34,21 +34,21 @@ function prepareData() {
     }
     
     const numberFilter = new Set()
-    Array("一", "二", "三", "四", "五", "六", "七").forEach(ele => numberFilter.add(ele))
+    Array("一", "二", "三", "四", "五", "六", "七","八","九").forEach(ele => numberFilter.add(ele))
     const result = new Set()
     const unsureSet = new Set()
     for (let i = 0; i < data.length; i++) {
         const len = data[i].length
         curr_arr_dp = new Array(len).fill(false)
         curr_arr_dp[0] = true
-        for (let a = 1; a <= len; a++) {
+        for (let outerIdx = 1; outerIdx <= len; outerIdx++) {
     
-            for (let b = a - 1; b >= 0; b--) {
-                if (curr_arr_dp[b]) {
-                    const splitWord = data[i].substring(b, a)
+            for (let InnerIdx = outerIdx - 1; InnerIdx >= 0; InnerIdx--) {
+                if (curr_arr_dp[InnerIdx]) {
+                    const splitWord = data[i].substring(InnerIdx, outerIdx)
     
                     if (unitSet.has(splitWord)) {
-                        curr_arr_dp[a] = true
+                        curr_arr_dp[outerIdx] = true
                         break
                     }
                 }

@@ -1,16 +1,10 @@
 const neo4j = require('neo4j-driver')
-
-const URI = 'neo4j://192.168.1.114'
-const USER = 'neo4j'
-const PASSWORD = 'darwinneo4j'
 let driver
 async function GetDb() {
     
     try {
-        driver = neo4j.driver(URI, neo4j.auth.basic(USER, PASSWORD))
-        const serverInfo = await driver.getServerInfo()
+        driver = neo4j.driver(process.env.db_uri.toString().trim(), neo4j.auth.basic(process.env.db_user.toString().trim(), process.env.db_password.toString().trim()))
         console.log('Connection estabilished')
-        console.log(serverInfo)
     } catch (err) {
         console.log(`Connection error\n${err}\nCause: ${err.cause}`)
         await driver.close()

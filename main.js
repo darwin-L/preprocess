@@ -1,10 +1,10 @@
 
 const db = require('./model/db');
 const prepareAgent = require('./data_prepare');
+
 (async () => {
     const data = prepareAgent.prepareData()
     const dbInstanse = await db()
-
 
     const relationSet = new Set()
     try {
@@ -26,21 +26,23 @@ const prepareAgent = require('./data_prepare');
                     j++
                 }
                 const endCheck = (j === s.length)
-                relationSet.add(insertValue)
-                await dbInstanse.executeQuery('MERGE (:word {value: $value ,end: $end})',
+                
+                const dbRes = await dbInstanse.executeQuery('MERGE (w:word {value: $value ,end: $end})  RETURN elementId(w)',
                     {
                         value: insertValue,
                         end: endCheck
                     },
                     { database: 'neo4j' }
                 )
-
+                relationSet.add(dbRes.records[0]._fields[0])
+    
             }
-
+            
             const arrayLikeSet = Array.from(relationSet)
             for (let i = 0; i < arrayLikeSet.length - 1; i++) {
+                
                 await dbInstanse.executeQuery(`MATCH (a:word), (b:word)
-                    WHERE a.value = $value1 AND a.end = false AND b.value = $value2
+                    WHERE elementId(a) = $value1 AND a.end = false AND elementId(b) = $value2 
                     CREATE (b)-[: Concat]->(a)
                     `,
                     {
